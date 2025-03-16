@@ -6,6 +6,7 @@ use Dusterio\PlainSqs\Sqs\Connector;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Queue\Events\JobProcessed;
+use Throwable;
 
 /**
  * Class CustomQueueServiceProvider
@@ -25,7 +26,18 @@ class LaravelServiceProvider extends ServiceProvider
         ]);
 
         Queue::after(function (JobProcessed $event) {
-            $event->job->delete();
+            try {
+                $event->job->delete();
+            } catch (Throwable $exception) {
+                if (strpos(get_class($exception), 'SqsException') !== false
+                    && strpos($exception->getMessage(), 'The receipt handle') !== false
+                    && strpos($exception->getMessage(), 'is not valid') !== false
+                ) {
+                    return;
+                } else {
+                    throw $exception;
+                }
+            }
         });
     }
 
